@@ -9,7 +9,7 @@ Repeat similar operations for Midnight Clearance (0x04) and Clamp Clearance (0x0
 
 
 **/////////////////////////
-/*Bit 1 (always 0 for alignment).
+Bit 1 (always 0 for alignment).
 Bit 2 (1 for Sword clearance, 0 otherwise).
 Bit 3 (1 for Midnight clearance, 0 otherwise).
 Bit 4 (1 for Clamp clearance, 0 otherwise).**
