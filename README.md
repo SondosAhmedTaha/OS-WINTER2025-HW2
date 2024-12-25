@@ -7,9 +7,9 @@ Check Sword Clearance: (task->clearances & 0x02) != 0
 Repeat similar operations for Midnight Clearance (0x04) and Clamp Clearance (0x08).
 
 
-**This text is bold**
-/////////////////////////
+
+**/////////////////////////
 /*Bit 1 (always 0 for alignment).
 Bit 2 (1 for Sword clearance, 0 otherwise).
 Bit 3 (1 for Midnight clearance, 0 otherwise).
-Bit 4 (1 for Clamp clearance, 0 otherwise).*/
+Bit 4 (1 for Clamp clearance, 0 otherwise).**
