@@ -1,0 +1,92 @@
+kernel/hw2.c: In function ‘sys_set_sec’:
+kernel/hw2.c:14:17: error: ‘EINVAL’ undeclared (first use in this function)
+         return -EINVAL; // Invalid arguments
+                 ^~~~~~
+kernel/hw2.c:14:17: note: each undeclared identifier is reported only once for each function it appears in
+kernel/hw2.c:18:10: error: implicit declaration of function ‘capable’ [-Werror=implicit-function-declaration]
+     if (!capable(CAP_SYS_ADMIN)) {
+          ^~~~~~~
+kernel/hw2.c:18:18: error: ‘CAP_SYS_ADMIN’ undeclared (first use in this function)
+     if (!capable(CAP_SYS_ADMIN)) {
+                  ^~~~~~~~~~~~~
+kernel/hw2.c:19:17: error: ‘EPERM’ undeclared (first use in this function)
+         return -EPERM; // Permission denied
+                 ^~~~~
+kernel/hw2.c:23:43: error: ‘current’ undeclared (first use in this function)
+     struct task_struct *curr_taskStruct = current;
+                                           ^~~~~~~
+kernel/hw2.c:23:5: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     struct task_struct *curr_taskStruct = current;
+     ^~~~~~
+kernel/hw2.c:26:20: error: dereferencing pointer to incomplete type ‘struct task_struct’
+     curr_taskStruct->clearances = 0;
+                    ^~
+kernel/hw2.c: In function ‘sys_get_sec’:
+kernel/hw2.c:47:43: error: ‘current’ undeclared (first use in this function)
+     struct task_struct *curr_taskStruct = current;
+                                           ^~~~~~~
+kernel/hw2.c:50:28: error: dereferencing pointer to incomplete type ‘struct task_struct’
+         if((curr_taskStruct->clearances & 0x02) != 0)
+                            ^~
+kernel/hw2.c:67:13: error: ‘EINVAL’ undeclared (first use in this function)
+     return -EINVAL; // Invalid input character
+             ^~~~~~
+kernel/hw2.c: In function ‘sys_check_sec’:
+kernel/hw2.c:79:26: error: ‘EINVAL’ undeclared (first use in this function)
+         default: return -EINVAL; // Invalid clearance argument
+                          ^~~~~~
+kernel/hw2.c:83:39: error: implicit declaration of function ‘pid_task’ [-Werror=implicit-function-declaration]
+     struct task_struct *the_process = pid_task(find_vpid(pid), PIDTYPE_PID);
+                                       ^~~~~~~~
+kernel/hw2.c:83:48: error: implicit declaration of function ‘find_vpid’ [-Werror=implicit-function-declaration]
+     struct task_struct *the_process = pid_task(find_vpid(pid), PIDTYPE_PID);
+                                                ^~~~~~~~~
+kernel/hw2.c:83:64: error: ‘PIDTYPE_PID’ undeclared (first use in this function); did you mean ‘DISABLE_PCID’?
+     struct task_struct *the_process = pid_task(find_vpid(pid), PIDTYPE_PID);
+                                                                ^~~~~~~~~~~
+                                                                DISABLE_PCID
+kernel/hw2.c:83:5: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     struct task_struct *the_process = pid_task(find_vpid(pid), PIDTYPE_PID);
+     ^~~~~~
+kernel/hw2.c:87:17: error: ‘ESRCH’ undeclared (first use in this function)
+         return -ESRCH; // Target process does not exist
+                 ^~~~~
+kernel/hw2.c:91:11: error: ‘current’ undeclared (first use in this function)
+     if (!(current->clearances & mask)) {
+           ^~~~~~~
+kernel/hw2.c:92:17: error: ‘EPERM’ undeclared (first use in this function)
+         return -EPERM; // Permission denied
+                 ^~~~~
+kernel/hw2.c:96:20: error: dereferencing pointer to incomplete type ‘struct task_struct’
+     if (the_process->clearances & mask) {
+                    ^~
+kernel/hw2.c: In function ‘sys_set_sec_branch’:
+kernel/hw2.c:106:32: error: ‘EINVAL’ undeclared (first use in this function)
+     if (height <= 0) { return -EINVAL; }
+                                ^~~~~~
+kernel/hw2.c:108:5: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     unsigned char mask = 0x00;
+     ^~~~~~~~
+kernel/hw2.c:118:11: error: ‘current’ undeclared (first use in this function)
+     if (!(current->clearances & mask)) {
+           ^~~~~~~
+kernel/hw2.c:119:17: error: ‘EPERM’ undeclared (first use in this function)
+         return -EPERM; // Permission denied
+                 ^~~~~
+kernel/hw2.c:122:5: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     struct task_struct* current_parent = current->real_parent;
+     ^~~~~~
+kernel/hw2.c:126:5: error: ‘for’ loop initial declarations are only allowed in C99 or C11 mode
+     for (int i = 0; i < height; i++) {
+     ^~~
+kernel/hw2.c:126:5: note: use option -std=c99, -std=gnu99, -std=c11 or -std=gnu11 to compile your code
+kernel/hw2.c:128:29: error: dereferencing pointer to incomplete type ‘struct task_struct’
+         if (!(current_parent->clearances & mask)) {
+                             ^~
+kernel/hw2.c: In function ‘sys_get_sec’:
+kernel/hw2.c:68:1: error: control reaches end of non-void function [-Werror=return-type]
+ }
+ ^
+kernel/hw2.c: In function ‘sys_check_sec’:
+kernel/hw2.c:101:1: error: control reaches end of non-void function [-Werror=return-type]
+ }
