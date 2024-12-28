@@ -68,15 +68,74 @@ asmlinkage long sys_get_sec(char clr){
 }
 
 
-asmlinkage long sys_check_sec(pid_t pid, char clr){
-	
-	
-	
+asmlinkage long sys_check_sec(pid_t pid, char clr) {
+    unsigned char mask = 0x00;
+
+    // Determine the clearance bitmask based on `clr`
+    switch (clr) {
+        case 's': mask = 0x02; break; // sword
+        case 'm': mask = 0x04; break; // midnight
+        case 'c': mask = 0x08; break; // clamps
+        default: return -EINVAL; // Invalid clearance argument
+    }
+
+    // Retrieve the target process by PID
+    struct task_struct *the_process = pid_task(find_vpid(pid), PIDTYPE_PID);
+
+    // Check if the target process exists
+    if (!the_process) {
+        return -ESRCH; // Target process does not exist
+    }
+
+    // Check if the calling process has the required clearance
+    if (!(current->clearances & mask)) {
+        return -EPERM; // Permission denied
+    }
+
+    // Check if the target process has the required clearance
+    if (the_process->clearances & mask) {
+        return 1; // Target process has the clearance
+    } else {
+        return 0; // Target process does not have the clearance
+    }
 }
 
 asmlinkage long sys_set_sec_branch(int height, char clr){
-	
-	
+
+    //check input
+    if (height <= 0) { return -EINVAL; }
+
+    unsigned char mask = 0x00;
+    // Determine the clearance bitmask based on `clr`
+    switch (clr) {
+        case 's': mask = 0x02; break; // sword
+        case 'm': mask = 0x04; break; // midnight
+        case 'c': mask = 0x08; break; // clamps
+        default: return -EINVAL; // Invalid clearance argument
+    }
+
+    // Check if the calling process has the required clearance
+    if (!(current->clearances & mask)) {
+        return -EPERM; // Permission denied
+    }
+
+    struct task_struct* current_parent = current->real_parent;
+    int counter = 0;
+
+    // Traverse up the parent hierarchy up to the specified height
+    for (int i = 0; i < height; i++) {
+        // Check if the parent already has the clearance
+        if (!(current_parent->clearances & mask)) {
+            // Add the clearance
+            current_parent->clearances |= mask;
+            counter++;
+        }
+
+        // Move to the next parent in the hierarchy
+        current_parent = current_parent->real_parent;
+    }
+
+    return counter;
 }
 
 
