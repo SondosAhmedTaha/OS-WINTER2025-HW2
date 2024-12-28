@@ -1,5 +1,10 @@
 #include <linux/kernel.h>
 
+#include <linux/errno.h>       // For error codes: EINVAL, EPERM, ESRCH
+#include <linux/sched.h>       // For current, task_struct
+#include <linux/pid.h>         // For pid_task, find_vpid
+#include <linux/capability.h>  // For capable()
+
 asmlinkage long sys_hello(void) {
 	printk("Hello, World!\n");
 	return 0;
@@ -7,6 +12,10 @@ asmlinkage long sys_hello(void) {
 
 
 asmlinkage long sys_set_sec(int sword, int midnight, int clamp){
+	
+	// Get the current task's task_struct
+    struct task_struct *curr_taskStruct = current;
+    
     // Validate inputs (only 0 or 1 are allowed for sword, midnight, and clamp)
     if (!(sword == 0 || sword == 1) ||
         !(midnight == 0 || midnight == 1) ||
@@ -18,9 +27,6 @@ asmlinkage long sys_set_sec(int sword, int midnight, int clamp){
     if (!capable(CAP_SYS_ADMIN)) {
         return -EPERM; // Permission denied
     }
-
-    // Get the current task's task_struct
-    struct task_struct *curr_taskStruct = current;
 
     // Initialize clearances to 0 before setting new values
     curr_taskStruct->clearances = 0;
@@ -69,7 +75,10 @@ asmlinkage long sys_get_sec(char clr){
 
 
 asmlinkage long sys_check_sec(pid_t pid, char clr) {
+	
     unsigned char mask = 0x00;
+    // Retrieve the target process by PID
+    struct task_struct *the_process = pid_task(find_vpid(pid), PIDTYPE_PID);
 
     // Determine the clearance bitmask based on `clr`
     switch (clr) {
@@ -78,9 +87,6 @@ asmlinkage long sys_check_sec(pid_t pid, char clr) {
         case 'c': mask = 0x08; break; // clamps
         default: return -EINVAL; // Invalid clearance argument
     }
-
-    // Retrieve the target process by PID
-    struct task_struct *the_process = pid_task(find_vpid(pid), PIDTYPE_PID);
 
     // Check if the target process exists
     if (!the_process) {
@@ -95,17 +101,20 @@ asmlinkage long sys_check_sec(pid_t pid, char clr) {
     // Check if the target process has the required clearance
     if (the_process->clearances & mask) {
         return 1; // Target process has the clearance
-    } else {
-        return 0; // Target process does not have the clearance
     }
+    return 0; // Target process does not have the clearance
 }
 
 asmlinkage long sys_set_sec_branch(int height, char clr){
 
+	unsigned char mask = 0x00;
+	struct task_struct* current_parent = current->real_parent;
+    int counter = 0;
+    int i = 0;
+	
     //check input
     if (height <= 0) { return -EINVAL; }
-
-    unsigned char mask = 0x00;
+    
     // Determine the clearance bitmask based on `clr`
     switch (clr) {
         case 's': mask = 0x02; break; // sword
@@ -119,11 +128,8 @@ asmlinkage long sys_set_sec_branch(int height, char clr){
         return -EPERM; // Permission denied
     }
 
-    struct task_struct* current_parent = current->real_parent;
-    int counter = 0;
-
     // Traverse up the parent hierarchy up to the specified height
-    for (int i = 0; i < height; i++) {
+    for (i = 0; i < height; i++) {
         // Check if the parent already has the clearance
         if (!(current_parent->clearances & mask)) {
             // Add the clearance
@@ -137,7 +143,3 @@ asmlinkage long sys_set_sec_branch(int height, char clr){
 
     return counter;
 }
-
-
-
-
