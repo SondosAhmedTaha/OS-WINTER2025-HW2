@@ -1,8 +1,14 @@
-#include <linux/errno.h>       // For error codes: EINVAL, EPERM, ESRCH
-#include <linux/sched.h>       // For current, task_struct
-#include <linux/pid.h>         // For pid_task, find_vpid
-#include <linux/capability.h>  // For capable()
-
-
-
-
+kernel/hw2.c: In function ‘sys_set_sec’:
+kernel/hw2.c:28:5: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     struct task_struct *curr_taskStruct = current;
+     ^~~~~~
+kernel/hw2.c: In function ‘sys_check_sec’:
+kernel/hw2.c:88:5: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     struct task_struct *the_process = pid_task(find_vpid(pid), PIDTYPE_PID);
+     ^~~~~~
+kernel/hw2.c: In function ‘sys_set_sec_branch’:
+kernel/hw2.c:112:5: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     unsigned char mask = 0x00;
+     ^~~~~~~~
+kernel/hw2.c:126:5: warning: ISO C90 forbids mixed declarations and code [-Wdeclaration-after-statement]
+     struct task_struct* current_parent = current->real_parent;
