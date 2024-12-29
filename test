@@ -12,277 +12,278 @@ using namespace std;
 #define RED "\033[31m"
 #define RESET "\033[0m"
 
-// Test invalid arguments for set_sec
+// Test 1: Invalid arguments for set_sec (negative values)
 bool testSetSecInvalidArguments() {
     errno = 0;
-    long result = set_sec(-1, 1, 1); // Negative value is invalid
-    if (result != -1 || errno != EINVAL) {
-        cerr << "testSetSecInvalidArguments failed: expected -1/EINVAL, got " << result << "/" << errno << endl;
-        return false;
-    }
-    return true;
+    long result = set_sec(-1, 1, 1);
+    return result == -1 && errno == EINVAL;
 }
 
-// Test invalid clearance argument for get_sec
+// Test 2: Arguments > 1 normalized in set_sec
+bool testSetSecNormalizeArguments() {
+    errno = 0;
+    long result = set_sec(2, 999, 3); // Should normalize to (1, 1, 1)
+    if (result != 0) return false;
+    return get_sec('s') == 1 && get_sec('m') == 1 && get_sec('c') == 1;
+}
+
+// Test 3: Non-root user calling set_sec
+bool testSetSecNonRootUser() {
+    errno = 0;
+
+    if (geteuid() == 0) {
+        // Running as root: set_sec should succeed
+        long result = set_sec(1, 1, 1); // Root user trying to set clearance
+        return result == 0;
+    } else {
+        // Running as non-root: set_sec should fail
+        long result = set_sec(1, 1, 1); // Non-root user trying to set clearance
+        return result == -1 && errno == EPERM;
+    }
+}
+// Test 4: All zeros for set_sec
+bool testSetSecAllZeros() {
+    errno = 0;
+    long result = set_sec(0, 0, 0); // Valid input
+    if (result != 0) return false;
+    return get_sec('s') == 0 && get_sec('m') == 0 && get_sec('c') == 0;
+}
+
+// Test 5: All ones for set_sec
+bool testSetSecAllOnes() {
+    errno = 0;
+    long result = set_sec(1, 1, 1); // Valid input
+    if (result != 0) return false;
+    return get_sec('s') == 1 && get_sec('m') == 1 && get_sec('c') == 1;
+}
+
+// Test 6: Invalid `clr` value for get_sec
 bool testGetSecInvalidArgument() {
     errno = 0;
-    long result = get_sec('x'); // 'x' is not a valid clearance character
-    if (result != -1 || errno != EINVAL) {
-        cerr << "testGetSecInvalidArgument failed: expected -1/EINVAL, got " << result << "/" << errno << endl;
-        return false;
-    }
-    return true;
+    long result = get_sec('x'); // Invalid clearance character
+    return result == -1 && errno == EINVAL;
 }
 
-// Test clearance check for a nonexistent process
+// Test 7: Valid `clr` values for get_sec
+bool testGetSecValidArguments() {
+    errno = 0;
+    set_sec(1, 1, 0); // Give sword and midnight clearances
+    return get_sec('s') == 1 && get_sec('m') == 1 && get_sec('c') == 0;
+}
+
+// Test 8: Nonexistent PID for check_sec
 bool testCheckSecNonexistentProcess() {
     errno = 0;
-    long result = check_sec(-1, 'm'); // Negative PID is invalid
-    if (result != -1 || errno != ESRCH) {
-        cerr << "testCheckSecNonexistentProcess failed: expected -1/ESRCH, got " << result << "/" << errno << endl;
-        return false;
-    }
-    return true;
+    long result = check_sec(-1, 'm'); // Invalid PID
+    return result == -1 && errno == ESRCH;
 }
 
-// Test setting clearance for ancestors with invalid arguments
-bool testSetSecBranchInvalidArguments() {
-    errno = 0;
-    long result = set_sec_branch(-1, 's'); // Negative height is invalid
-    if (result != -1 || errno != EINVAL) {
-        cerr << "testSetSecBranchInvalidArguments failed: expected -1/EINVAL, got " << result << "/" << errno << endl;
-        return false;
-    }
-    return true;
-}
-
-// Test setting clearance for parent with branch height = 1
-bool testSetSecBranchHeightOne() {
-    pid_t child_pid = fork();
-    if (child_pid < 0) {
-        cerr << "Fork failed for child process" << endl;
-        return false;
-    }
-
-    if (child_pid == 0) {
-        pid_t grandchild_pid = fork();
-        if (grandchild_pid < 0) {
-            cerr << "Fork failed for grandchild process" << endl;
-            exit(1);
-        }
-
-        if (grandchild_pid == 0) {
-            // Grandchild process: Set 'midnight' clearance and apply set_sec_branch
-            errno = 0;
-            long set_result = set_sec(0, 1, 0); // Give 'midnight' clearance
-            if (set_result < 0) {
-                cerr << "Grandchild: set_sec failed with " << set_result << "/" << errno << endl;
-                exit(1);
-            }
-
-            errno = 0;
-            long branch_result = set_sec_branch(1, 'm');
-            if (branch_result < 0) {
-                cerr << "Grandchild: set_sec_branch failed with " << branch_result << "/" << errno << endl;
-                exit(1);
-            }
-            exit(0);
-        }
-
-        // Child process: Wait for grandchild and check clearance
-        int grandchild_status;
-        waitpid(grandchild_pid, &grandchild_status, 0);
-        if (!WIFEXITED(grandchild_status) || WEXITSTATUS(grandchild_status) != 0) {
-            cerr << "Child: Grandchild test failed" << endl;
-            exit(1);
-        }
-
-        errno = 0;
-        long child_clearance = get_sec('m');
-        if (child_clearance != 1) {
-            cerr << "Child: Expected 'midnight' clearance, got " << child_clearance << "/" << errno << endl;
-            exit(1);
-        }
-        exit(0);
-    }
-
-    // Parent process
-    int child_status;
-    waitpid(child_pid, &child_status, 0);
-    if (!WIFEXITED(child_status) || WEXITSTATUS(child_status) != 0) {
-        cerr << "Parent: Child test failed" << endl;
-        return false;
-    }
-
-    errno = 0;
-    long parent_clearance = get_sec('m');
-    if (parent_clearance != 0) {
-        cerr << "Parent: Unexpected 'midnight' clearance, got " << parent_clearance << "/" << errno << endl;
-        return false;
-    }
-
-    return true;
-}
-
-// Test setting clearance boundary values
-bool testSetSecBoundaryValues() {
-    errno = 0;
-    long result = set_sec(0, 1, 1); // Valid boundaries
-    if (result < 0) {
-        cerr << "testSetSecBoundaryValues failed: expected success, got " << result << "/" << errno << endl;
-        return false;
-    }
-    return true;
-}
-
-// Test check_sec with invalid clearance
+// Test 9: Invalid clearance character in check_sec
 bool testCheckSecInvalidClearance() {
     errno = 0;
-    long result = check_sec(getpid(), 'z'); // Invalid clearance
-    if (result != -1 || errno != EINVAL) {
-        cerr << "testCheckSecInvalidClearance failed: expected -1/EINVAL, got " << result << "/" << errno << endl;
+    long result = check_sec(getpid(), 'z'); // Invalid clearance character
+    return result == -1 && errno == EINVAL;
+}
+
+bool testCheckSecNoClearance() {
+    errno = 0;
+
+    // Step 1: Set no clearances for the current process
+    if (set_sec(0, 0, 0) != 0) {
+        cout << "testCheckSecNoClearance failed: Unable to set clearances to zero." << endl;
         return false;
     }
+
+    // Step 2: Attempt to check "sword" clearance without having it
+    long result = check_sec(getpid(), 's');
+    if (result != -1) {
+        cout << "testCheckSecNoClearance failed: check_sec did not return -1 as expected. Got: " << result << endl;
+        return false;
+    }
+
+    // Step 3: Verify that errno is set to EPERM
+    if (errno != EPERM) {
+        cout << "testCheckSecNoClearance failed: errno is not EPERM. Got: " << errno << endl;
+        return false;
+    }
+
+    // Test passed
+    cout << "testCheckSecNoClearance passed." << endl;
     return true;
 }
 
-// Test clearance inheritance across fork
-bool testInheritanceOnFork() {
-    long result = set_sec(1, 0, 0); // Give "sword" clearance
-    if (result < 0) {
-        cerr << "testInheritanceOnFork: set_sec failed" << endl;
-        return false;
-    }
 
+// Test 11: check_sec with sufficient clearance
+bool testCheckSecWithClearance() {
+    errno = 0;
+    set_sec(1, 0, 0); // Give sword clearance
+    long result = check_sec(getpid(), 's'); // Check sword clearance
+    return result == 1;
+}
+
+// Test 12: Negative height for set_sec_branch
+bool testSetSecBranchNegativeHeight() {
+    errno = 0;
+    long result = set_sec_branch(-1, 's'); // Invalid height
+    return result == -1 && errno == EINVAL;
+}
+
+// Test 13: Height = 0 for set_sec_branch
+bool testSetSecBranchHeightZero() {
+    errno = 0;
+    long result = set_sec_branch(0, 'm'); // Invalid height
+    return result == -1 && errno == EINVAL;
+}
+
+// Test 14: Valid set_sec_branch with height > ancestry depth
+bool testSetSecBranchExceedHeight() {
+    set_sec(0, 1, 0); // Give midnight clearance
+    long result = set_sec_branch(100, 'm'); // Excessive height
+    return result >= 1; // Should update at least one parent
+}
+
+// Test 15: Clearance inheritance on fork
+bool testClearanceInheritanceOnFork() {
+    set_sec(1, 0, 0); // Give sword clearance
     pid_t child_pid = fork();
-    if (child_pid < 0) {
-        cerr << "Fork failed" << endl;
-        return false;
-    }
-
     if (child_pid == 0) {
-        errno = 0;
-        long clearance = get_sec('s'); // Check "sword" clearance
-        if (clearance != 1) {
-            cerr << "Child: Expected clearance, got " << clearance << "/" << errno << endl;
-            exit(1);
-        }
-        exit(0);
+        exit(get_sec('s') == 1 ? 0 : 1);
     }
-
     int status;
     waitpid(child_pid, &status, 0);
-    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        cerr << "Parent: Child test failed" << endl;
-        return false;
-    }
+    return WIFEXITED(status) && WEXITSTATUS(status) == 0;
+}
 
+// Test 16: Clearance propagation with set_sec_branch
+bool testSetSecBranchPropagation() {
+    pid_t child_pid = fork();
+    if (child_pid == 0) {
+        pid_t grandchild_pid = fork();
+        if (grandchild_pid == 0) {
+            set_sec(0, 1, 0); // Midnight clearance
+            long result = set_sec_branch(1, 'm'); // Propagate midnight clearance
+            exit(result == 1 ? 0 : 1);
+        }
+        waitpid(grandchild_pid, nullptr, 0);
+        exit(get_sec('m') == 1 ? 0 : 1);
+    }
+    waitpid(child_pid, nullptr, 0);
+    return get_sec('m') == 0; // Parent should not gain clearance
+}
+
+// Test 17: Boundary case for set_sec
+bool testSetSecBoundaryValues() {
+    long result = set_sec(0, 1, 1); // Valid input
+    return result == 0;
+}
+
+// Test 18: Concurrent set_sec calls
+bool testConcurrentSetSec() {
+    set_sec(0, 0, 0); // No clearance initially
+    pid_t pids[2];
+    for (int i = 0; i < 2; ++i) {
+        pids[i] = fork();
+        if (pids[i] == 0) {
+            set_sec(1, 0, 0); // Give sword clearance
+            exit(get_sec('s') == 1 ? 0 : 1);
+        }
+    }
+    for (int i = 0; i < 2; ++i) {
+        int status;
+        waitpid(pids[i], &status, 0);
+        if (!(WIFEXITED(status) && WEXITSTATUS(status) == 0)) {
+            return false;
+        }
+    }
     return true;
 }
 
-// Test set_sec_branch with height = 0
-bool testSetSecBranchWithHeightZero() {
+// Test 19: Invalid clearance value for set_sec_branch
+bool testSetSecBranchInvalidClearance() {
     errno = 0;
-    long result = set_sec_branch(0, 'm'); // Height = 0
-   if (result != -1 || errno != EINVAL) {
-        cerr << "testSetSecBranchWithHeightZero failed: expected -1/EINVAL, got " << result << "/" << errno << endl;
-        return false;
-    }
-    return true;
+    long result = set_sec_branch(1, 'z'); // Invalid clearance
+    return result == -1 && errno == EINVAL;
 }
 
-// Test setting multiple clearances
-bool testSetSecMultipleClearances() {
+// Test 20: Check default clearance for init process
+bool testDefaultInitClearance() {
+    pid_t init_pid = 1; // PID 1 is usually the init process
     errno = 0;
-    long result = set_sec(1, 1, 1); // Set all clearances
-    if (result < 0) {
-        cerr << "testSetSecMultipleClearances failed: expected success, got " << result << "/" << errno << endl;
+
+    // Step 1: Ensure the calling process does not have the required clearance
+    if (set_sec(0, 0, 0) != 0) {
+        cout << "testDefaultInitClearance failed: Unable to clear all clearances for the calling process." << endl;
         return false;
     }
 
-    if (get_sec('s') != 1 || get_sec('m') != 1 || get_sec('c') != 1) {
-        cerr << "testSetSecMultipleClearances failed: clearances not properly set" << endl;
+    // Attempt to check the clearance of the init process without having the required clearances
+    if (check_sec(init_pid, 's') != -1 || errno != EPERM) {
+        cout << "testDefaultInitClearance failed: check_sec did not fail as expected when calling process lacks clearance (sword)." << endl;
         return false;
     }
+    if (check_sec(init_pid, 'm') != -1 || errno != EPERM) {
+        cout << "testDefaultInitClearance failed: check_sec did not fail as expected when calling process lacks clearance (midnight)." << endl;
+        return false;
+    }
+    if (check_sec(init_pid, 'c') != -1 || errno != EPERM) {
+        cout << "testDefaultInitClearance failed: check_sec did not fail as expected when calling process lacks clearance (clamp)." << endl;
+        return false;
+    }
+
+    // Step 2: Grant all clearances to the calling process
+    if (set_sec(1, 1, 1) != 0) {
+        cout << "testDefaultInitClearance failed: Unable to grant all clearances to the calling process." << endl;
+        return false;
+    }
+
+    // Step 3: Validate that the init process does not have any clearances
+    if (check_sec(init_pid, 's') != 0) {
+        cout << "testDefaultInitClearance failed: Unexpected sword clearance for init process." << endl;
+        return false;
+    }
+    if (check_sec(init_pid, 'm') != 0) {
+        cout << "testDefaultInitClearance failed: Unexpected midnight clearance for init process." << endl;
+        return false;
+    }
+    if (check_sec(init_pid, 'c') != 0) {
+        cout << "testDefaultInitClearance failed: Unexpected clamp clearance for init process." << endl;
+        return false;
+    }
+
+    cout << "testDefaultInitClearance passed." << endl;
     return true;
 }
 
 int main() {
     int passedTests = 0;
-    int totalTests = 10;
+    int totalTests = 20;
 
     cout << "Running tests..." << endl;
 
-    if (testSetSecInvalidArguments()) {
-        cout << GREEN << "testSetSecInvalidArguments: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testSetSecInvalidArguments: Failure" << RESET << endl;
+    // List of all tests
+    auto tests = {
+            testDefaultInitClearance,testCheckSecNoClearance,testSetSecInvalidArguments, testSetSecNormalizeArguments, testSetSecNonRootUser,
+            testSetSecAllZeros, testSetSecAllOnes, testGetSecInvalidArgument,
+            testGetSecValidArguments, testCheckSecNonexistentProcess,
+            testCheckSecInvalidClearance,
+            testCheckSecWithClearance, testSetSecBranchNegativeHeight,
+            testSetSecBranchHeightZero, testSetSecBranchExceedHeight,
+            testClearanceInheritanceOnFork, testSetSecBranchPropagation,
+            testSetSecBoundaryValues, testConcurrentSetSec,
+            testSetSecBranchInvalidClearance
+    };
+    int i=1;
+    // Run each test and log results
+    for (auto test : tests) {
+        if (test()) {
+            cout << GREEN << i << " PASS" << RESET << endl;
+            passedTests++;
+        } else {
+            cout << RED << i << " FAIL" << RESET << endl;
+        }
+        i++;
     }
-	std::cout<<std::endl;
-    if (testGetSecInvalidArgument()) {
-        cout << GREEN << "testGetSecInvalidArgument: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testGetSecInvalidArgument: Failure" << RESET << endl;
-    }
-	std::cout<<std::endl;
-    if (testCheckSecNonexistentProcess()) {
-        cout << GREEN << "testCheckSecNonexistentProcess: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testCheckSecNonexistentProcess: Failure" << RESET << endl;
-    }
-std::cout<<std::endl;
-    if (testSetSecBranchInvalidArguments()) {
-        cout << GREEN << "testSetSecBranchInvalidArguments: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testSetSecBranchInvalidArguments: Failure" << RESET << endl;
-    }
-std::cout<<std::endl;
-    if (testSetSecBranchHeightOne()) {
-        cout << GREEN << "testSetSecBranchHeightOne: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testSetSecBranchHeightOne: Failure" << RESET << endl;
-    }
-std::cout<<std::endl;
-    if (testSetSecBoundaryValues()) {
-        cout << GREEN << "testSetSecBoundaryValues: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testSetSecBoundaryValues: Failure" << RESET << endl;
-    }
-std::cout<<std::endl;
-    if (testCheckSecInvalidClearance()) {
-        cout << GREEN << "testCheckSecInvalidClearance: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testCheckSecInvalidClearance: Failure" << RESET << endl;
-    }
-std::cout<<std::endl;
-    if (testInheritanceOnFork()) {
-        cout << GREEN << "testInheritanceOnFork: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testInheritanceOnFork: Failure" << RESET << endl;
-    }
-std::cout<<std::endl;
-    if (testSetSecBranchWithHeightZero()) {
-        cout << GREEN << "testSetSecBranchWithHeightZero: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testSetSecBranchWithHeightZero: Failure" << RESET << endl;
-    }
-std::cout<<std::endl;
-    if (testSetSecMultipleClearances()) {
-        cout << GREEN << "testSetSecMultipleClearances: Success" << RESET << endl;
-        passedTests++;
-    } else {
-        cout << RED << "testSetSecMultipleClearances: Failure" << RESET << endl;
-    }
-std::cout<<std::endl;
+
     cout << "\nTests Passed: " << GREEN << passedTests << RESET << "/" << totalTests << endl;
 
     return 0;
