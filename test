@@ -1,0 +1,649 @@
+#include "hw2_test.h"
+#include <stdio.h>
+#include <iostream>
+#include <cassert>
+#include <errno.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+
+using namespace std;
+
+enum clearances {
+	N = 0,
+    S=1,
+    M=2,
+    C=4,
+    SM=3,
+    SC=5,
+    MC=6,
+    SMC=7
+};
+
+
+void PrintCurrentProcessClearances() {
+
+	int Sc = get_sec('s');
+	int Mc = get_sec('m');
+	int Cc = get_sec('c');
+
+	cout << "Current process clearances: ";
+
+	if (Sc == 1) {
+		cout << "S ";
+	}else{
+		cout << "N ";
+	}
+
+	if (Mc == 1) {
+		cout << "M ";
+	}else{
+		cout << "N ";
+	}
+
+	if (Cc == 1) {
+		cout << "C ";
+	}else{
+		cout << "N ";
+	}
+	
+}
+
+void PrintProcessClearancesByPID(int pid) {
+
+	int Sc = check_sec(pid, 's');
+
+	if (Sc == -1) {
+		
+		int err = errno;
+
+		if (err == EINVAL) {
+			cout << "Invalid arguments";
+		}else if (err == EPERM) {
+			cout << "Process does not have the S clearance so it cannot check the S clearance of another process";
+		}else if (err == ESRCH) {
+			cout << "Process does not exist";
+		}
+
+	}
+
+	int Mc = check_sec(pid, 'm');
+
+	if (Mc == -1) {
+		
+		int err = errno;
+
+		if (err == EINVAL) {
+			cout << "Invalid arguments";
+		}else if (err == EPERM) {
+			cout << "Process does not have the M clearance so it cannot check the M clearance of another process";
+		}else if (err == ESRCH) {
+			cout << "Process does not exist";
+		}
+
+	}
+
+	int Cc = check_sec(pid, 'c');
+
+	if (Cc == -1) {
+		
+		int err = errno;
+
+		if (err == EINVAL) {
+			cout << "Invalid arguments";
+		}else if (err == EPERM) {
+			cout << "Process does not have the C clearance so it cannot check the C clearance of another process";
+		}else if (err == ESRCH) {
+			cout << "Process does not exist";
+		}
+
+	}
+
+	cout << "Process clearances: ";
+
+	if (Sc == 1) {
+		cout << "S ";
+	}else{
+		cout << "N ";
+	}
+
+	if (Mc == 1) {
+		cout << "M ";
+	}else{
+		cout << "N ";
+	}
+
+	if (Cc == 1) {
+		cout << "C ";
+	}else{
+		cout << "N ";
+	}
+	
+}
+
+// returns the current process clearances as an enum with range 0-7
+clearances GetCurrentClearances(){
+
+	int Sc = get_sec('s');
+	int Mc = get_sec('m');
+	int Cc = get_sec('c');
+
+	try {
+
+		if (Sc == -1 || Mc == -1 || Cc == -1) {
+			
+			if (errno == EINVAL) {
+				throw ("Error: Invalid arguments");
+			}
+			else {
+				throw ("Error: Process should always be able to check its own clearances");
+			}
+
+		}
+
+	}
+	catch (string e) {
+		cout << e << endl;
+	}
+	
+	if (Sc == 1 && Mc == 1 && Cc == 1) {
+		return SMC;
+	}else if (Sc == 1 && Mc == 1 && Cc == 0) {
+		return SM;
+	}else if (Sc == 1 && Mc == 0 && Cc == 1) {
+		return SC;
+	}else if (Sc == 0 && Mc == 1 && Cc == 1) {
+		return MC;
+	}else if (Sc == 1 && Mc == 0 && Cc == 0) {
+		return S;
+	}else if (Sc == 0 && Mc == 1 && Cc == 0) {
+		return M;
+	}else if (Sc == 0 && Mc == 0 && Cc == 1) {
+		return C;
+	}else{
+		return N;
+	}
+
+}
+
+int SetCurrentClearances(clearances set){
+
+	int S = set & 1;
+	int M = set & 2;
+	int C = set & 4;
+
+	int r = set_sec(S, M, C);
+
+	try {
+
+		if (r == -1) {
+			
+			if (errno == EINVAL) {
+				throw ("Error: Invalid arguments");
+			}
+			else if (errno == EPERM) {
+				throw ("Error: Process does not have root privilege, did you forget sudo?");
+			}
+			else {
+				throw ("Error: Process should always be able to set its own clearances");
+			}
+
+		}
+
+	}
+	catch (string e) {
+		cout << e << endl;
+	}
+
+	assert(r==0);
+	return 1;
+}
+
+
+clearances getProcessClearancesAsRoot(pid_t pid){
+
+	clearances old = GetCurrentClearances();
+	SetCurrentClearances(SMC);
+
+	int Sc = check_sec(pid, 's');
+	int Mc = check_sec(pid, 'm');
+	int Cc = check_sec(pid, 'c');
+
+	try {
+
+		if (Sc == -1 || Mc == -1 || Cc == -1) {
+			
+			if (errno == EINVAL) {
+				throw ("Error: Invalid arguments");
+			}
+			else if (errno == EPERM) {
+				throw ("Error: SMC Process should always be able to check the clearances of any process");
+			}
+			else if (errno == ESRCH) {
+				throw ("Error: Process does not exist");
+			}else{
+				throw ("Error: Error at check_sec");
+			}
+
+		}
+
+	}
+	catch (string e) {
+		cout << e << endl;
+	}
+
+	int result = N;
+
+	if (Sc == 1) {
+		result = result | S;
+	}
+
+	if (Mc == 1) {
+		result = result | M;
+	}
+
+	if (Cc == 1) {
+		result = result | C;
+	}
+
+	SetCurrentClearances(old);
+	
+	clearances res = (clearances)result;
+	return res;
+
+}
+
+
+void CheckInitClearances(clearances init_c){
+
+	
+	clearances c = getProcessClearancesAsRoot(1);
+	assert(c == init_c);
+	
+}
+
+void CheckSetSec(){
+
+	clearances old_f = GetCurrentClearances();
+
+	// Test all combinations of clearances
+	for (int s = 0; s <= 1; ++s) {
+		for (int m = 0; m <= 1; ++m) {
+			for (int c = 0; c <= 1; ++c) {
+				set_sec(s, m, c);
+				assert(get_sec('s') == s);
+				assert(get_sec('m') == m);
+				assert(get_sec('c') == c);
+			}
+		}
+	}
+
+	SetCurrentClearances(old_f);
+
+}
+
+void CheckSetSecBranch(){
+
+	clearances old_f = GetCurrentClearances();
+
+	for (int s = 0; s <= 1; ++s) {
+		for (int m = 0; m <= 1; ++m) {
+			for (int c = 0; c <= 1; ++c) {
+
+				clearances old_father = GetCurrentClearances();
+
+				int res = fork(); 
+
+				if (res == 0) {
+					// child
+
+
+					clearances old = GetCurrentClearances();
+					SetCurrentClearances(SMC);
+					
+				
+					if (s == 1) {
+						set_sec_branch(1, 's');
+					}
+					if (m == 1) {
+						set_sec_branch(1, 'm');
+					}
+					if (c == 1) {
+						set_sec_branch(1, 'c');
+					}
+
+					SetCurrentClearances(old);
+					exit(0);
+
+				}
+				else {
+					
+					waitpid(res, NULL, 0); // waitpid is from unistd.h
+
+					if (s == 1) {
+						assert(get_sec('s') == 1);
+					}else{
+						assert(get_sec('s') == 0);
+					}
+
+					if (m == 1) {
+						assert(get_sec('m') == 1);
+					}else{
+						assert(get_sec('m') == 0);
+					}
+
+					if (c == 1) {
+						assert(get_sec('c') == 1);
+					}else{
+						assert(get_sec('c') == 0);
+					}
+
+					SetCurrentClearances(old_father);
+
+
+				}
+
+				
+			}
+		}
+	}
+	
+	SetCurrentClearances(old_f);
+
+}
+
+void recursiveSetSecBranch(int height){
+
+	if (height == 1) {
+
+		CheckSetSecBranch();
+		return;
+	}
+
+	int res = fork();
+
+	if (res == 0) {
+		
+		recursiveSetSecBranch(height-1);
+		CheckSetSecBranch();
+		exit(0);
+	}
+	else {
+
+		waitpid(res, NULL, 0);
+	}	
+
+}
+
+
+int main() {
+
+	cout << endl;
+	cout << "-------------- WELCOME TO THIS TEST OF HW2 ----------------" << endl;
+	cout << "this test is *NOT* official, so it may not be correct" << endl;
+	cout << "IMPORTENT: in this test we assume init has clearances NNN=0" << endl;
+	cout << "any use of this test is at your own risk" << endl;
+	cout << endl;
+	cout << "-------------- WHAT WE CHECK ----------------" << endl;
+	cout << "1. check init clearances are NNN=0" << endl;
+	cout << "2. check set_sec works for all combinations" << endl;
+	cout << "3. check set_sec_branch works for all combinations up to deep of 10 (with fork)" << endl;
+	cout << "4. check set_sec_branch works to back, with 5 forks sequentially and with assert on ret value" << endl;
+	cout << "5. arguments validity" << endl;
+	cout << endl;
+	cout << "--------------GOOD LUCK! ----------------" << endl;
+	cout << endl;
+
+	clearances init = getProcessClearancesAsRoot(1);
+	if (init != N) {
+
+		cout << "init clearances: " << init <<" and is not NNN(=0)!!" << endl;
+		cout << "look at the enum clearances to know more" << endl;
+		cout << "try reboot your system" << endl;
+		return 0;
+	}
+
+	CheckInitClearances(N);
+
+	CheckSetSec();
+
+	int height = 10; // DEFAULT value - you can change it to >= 1
+	recursiveSetSecBranch(height);
+
+	clearances old = GetCurrentClearances();
+	SetCurrentClearances(SMC);
+
+	int res1 = fork();
+	SetCurrentClearances(N);
+
+	if (res1 == 0) {
+		// child
+
+		int res2 = fork();
+		SetCurrentClearances(N);
+
+		if (res2 == 0) {
+			// child
+
+			int res3 = fork();
+			SetCurrentClearances(N);
+
+			if (res3 == 0) {
+				// child
+
+				int res4 = fork();
+				SetCurrentClearances(N);
+
+				if (res4 == 0) {
+					// child
+
+					int res5 = fork();
+					SetCurrentClearances(N);
+
+					if (res5 == 0) {
+						// child
+
+						clearances old = GetCurrentClearances();
+						SetCurrentClearances(SMC);
+
+						
+						int set = set_sec_branch(1, 's');
+						assert(set == 1);
+						set = set_sec_branch(1, 'm');
+						assert(set == 1);
+						set = set_sec_branch(1, 'c');
+						assert(set == 1);
+						
+						
+
+						assert(set_sec_branch(2, 's') == 1); // == 1 because the parent has the S clearance so it won't change
+						// we can't check the grandparent's clearances because we don't have it's pid
+						assert(set_sec_branch(2, 'm') == 1); // == 1 because the parent has the M clearance so it won't change
+						// we can't check the grandparent's clearances because we don't have it's pid
+						assert(set_sec_branch(2, 'c') == 1); // == 1 because the parent has the C clearance so it won't change
+						// we can't check the grandparent's clearances because we don't have it's pid
+
+						assert(set_sec_branch(3, 's') == 1); // == 1 because the parent has the S clearance so it won't change
+						// we can't check the great grandparent's clearances because we don't have it's pid
+						assert(set_sec_branch(3, 'm') == 1); // == 1 because the parent has the M clearance so it won't change
+						// we can't check the great grandparent's clearances because we don't have it's pid
+						assert(set_sec_branch(3, 'c') == 1); // == 1 because the parent has the C clearance so it won't change
+						// we can't check the great grandparent's clearances because we don't have it's pid
+
+
+						assert(set_sec_branch(5, 's') == 2); // == 2 because the parent does not have the S clearance so it will change
+						// we can't check the great great great grandparent's clearances because we don't have it's pid
+						assert(set_sec_branch(5, 'm') == 2); // == 2 because the parent does not have the M clearance so it will change
+						// we can't check the great great great grandparent's clearances because we don't have it's pid
+						assert(set_sec_branch(5, 'c') == 2); // == 2 because the parent does not have the C clearance so it will change
+						// we can't check the great great great grandparent's clearances because we don't have it's pid 
+
+
+						exit(0);
+
+					}
+					else {
+						waitpid(res5, NULL, 0); // waitpid is from unistd.h
+						assert(GetCurrentClearances() == SMC);
+					}
+
+					exit(0);
+
+				}
+				else {
+					waitpid(res4, NULL, 0); // waitpid is from unistd.h
+					assert(GetCurrentClearances() == SMC);
+				}
+
+				exit(0);
+
+			}
+			else {
+				waitpid(res3, NULL, 0); // waitpid is from unistd.h
+				assert(GetCurrentClearances() == SMC);
+			}
+
+			exit(0);
+
+		}
+		else {
+			waitpid(res2, NULL, 0); // waitpid is from unistd.h
+			assert(GetCurrentClearances() == SMC);
+		}
+		
+		exit(0);
+
+	}
+	else {
+		waitpid(res1, NULL, 0); // waitpid is from unistd.h
+		assert(GetCurrentClearances() == SMC);
+
+	}
+	
+	SetCurrentClearances(old);
+
+
+	// let's check arguments validity!
+
+	set_sec(-1, 0, 0);
+	assert(errno == EINVAL);
+	set_sec(0, -1, 0);
+	assert(errno == EINVAL);
+	set_sec(0, 0, -1);
+	assert(errno == EINVAL);
+
+
+	for (char clr = 'a'; clr <= 'z'; ++clr) {
+		
+		if (clr == 's' || clr == 'm' || clr == 'c') {
+			continue;
+		}
+		else{
+			get_sec(clr);
+			assert(errno == EINVAL);
+		}
+		
+	}
+
+	for (char clr = 'a'; clr <= 'z'; ++clr) {
+		
+		if (clr == 's' || clr == 'm' || clr == 'c') {
+			continue;
+		}
+		else{
+			check_sec(1, clr);
+			assert(errno == EINVAL);
+		}
+		
+	}
+
+	clearances old_d = GetCurrentClearances();
+	SetCurrentClearances(SMC);
+
+
+	for (int pid = -100; pid < 0; ++pid) {
+		
+		check_sec(pid, 's');
+		assert(errno == ESRCH);
+		check_sec(pid, 'm');
+		assert(errno == ESRCH);
+		check_sec(pid, 'c');
+		assert(errno == ESRCH);
+		
+	}
+
+	
+	SetCurrentClearances(N);// current has no clearances
+	int parentp = getppid();
+
+	check_sec(parentp, 's');
+	assert(errno == EPERM);
+	check_sec(parentp, 'm');
+	assert(errno == EPERM);
+	check_sec(parentp, 'c');
+	assert(errno == EPERM);
+
+	SetCurrentClearances(SMC);
+
+	int random_pid = 132415;
+	check_sec(random_pid, 's');
+	assert(errno == ESRCH);
+	check_sec(random_pid, 'm');
+	assert(errno == ESRCH);
+	check_sec(random_pid, 'c');
+	assert(errno == ESRCH);
+
+	SetCurrentClearances(old_d);
+
+
+	for (char clr = 'a'; clr <= 'z'; ++clr) {
+		
+		if (clr == 's' || clr == 'm' || clr == 'c') {
+			continue;
+		}
+		else{
+			set_sec_branch(-1, clr);
+			assert(errno == EINVAL);
+		}
+		
+	}
+
+	for (int height = -100; height < 0; ++height) {
+		
+		set_sec_branch(height, 's');
+		assert(errno == EINVAL);
+		set_sec_branch(height, 'm');
+		assert(errno == EINVAL);
+		set_sec_branch(height, 'c');
+		assert(errno == EINVAL);
+		
+	}
+
+	old_d = GetCurrentClearances();
+	SetCurrentClearances(N);// current has no clearances
+
+	set_sec_branch(1, 's');
+	assert(errno == EPERM);
+	set_sec_branch(1, 'm');
+	assert(errno == EPERM);
+	set_sec_branch(1, 'c');
+	assert(errno == EPERM);
+
+	SetCurrentClearances(old_d);
+	
+	cout << "you !!!!!!PASSED*!!!!!!!!! *if there is not assertions error printed above" << endl;
+	cout << "remember that this test is not official, so it may not be correct" << endl;
+	cout << endl;
+
+	return 0;
+}
+
+
+
+
+// need to check with another tests:
+
+// arguments are invalid
+// arguments are valid but the process does not have the relevant clearance
+// arguments are valid and the process has the relevant clearance
+// arguments are valid and the process has the relevant clearance but the target process does not exist
