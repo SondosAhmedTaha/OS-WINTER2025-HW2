@@ -48,7 +48,6 @@ asmlinkage long sys_set_sec(int sword, int midnight, int clamp){
 }
 
 
-
 asmlinkage long sys_get_sec(char clr){
     struct task_struct *curr_taskStruct = current;
 
