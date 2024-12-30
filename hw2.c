@@ -17,9 +17,7 @@ asmlinkage long sys_set_sec(int sword, int midnight, int clamp){
     struct task_struct *curr_taskStruct = current;
     
     // Validate inputs (only 0 or 1 are allowed for sword, midnight, and clamp)
-    if (!(sword == 0 || sword == 1) ||
-        !(midnight == 0 || midnight == 1) ||
-        !(clamp == 0 || clamp == 1)) {
+    if (sword < 0 || midnight < 0 || clamp < 0 ) {
         return -EINVAL; // Invalid arguments
     }
 
