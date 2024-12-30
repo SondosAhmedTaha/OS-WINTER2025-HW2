@@ -30,15 +30,15 @@ asmlinkage long sys_set_sec(int sword, int midnight, int clamp){
     curr_taskStruct->clearances = 0;
 
     // Set or clear the corresponding bits in the `clearances` field
-    if (sword == 1) {
+    if (sword >= 1) {
         curr_taskStruct->clearances |= 0x02; // Set the 2nd bit (Sword clearance)
     }
 
-    if (midnight == 1) {
+    if (midnight >= 1) {
         curr_taskStruct->clearances |= 0x04; // Set the 3rd bit (Midnight clearance)
     }
 
-    if (clamp == 1) {
+    if (clamp >= 1) {
         curr_taskStruct->clearances |= 0x08; // Set the 4th bit (Clamp clearance)
     }
 
